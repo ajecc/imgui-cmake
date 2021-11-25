@@ -2,14 +2,24 @@ cmake_minimum_required(VERSION 3.16.3)
 
 project(imgui-cmake LANGUAGES C CXX)
 
-#=================== SDL2 ===================
+set(CPM_DOWNLOAD_VERSION 0.34.0)
+if(CPM_SOURCE_CACHE)
+  set(CPM_DOWNLOAD_LOCATION "${CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+elseif(DEFINED ENV{CPM_SOURCE_CACHE})
+  set(CPM_DOWNLOAD_LOCATION "$ENV{CPM_SOURCE_CACHE}/cpm/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+else()
+  set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+endif()
+if(NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))
+  message(STATUS "Downloading CPM.cmake to ${CPM_DOWNLOAD_LOCATION}")
+  file(DOWNLOAD
+       https://github.com/TheLartians/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake
+       ${CPM_DOWNLOAD_LOCATION}
+  )
+endif()
+include(${CPM_DOWNLOAD_LOCATION})
 
 
-set(SDL2_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SDL)
-add_subdirectory(${SDL2_DIR})
-
-
-#=================== IMGUI ===================
 
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 add_library(IMGUI STATIC)
@@ -30,15 +40,18 @@ target_sources( IMGUI
 target_include_directories( IMGUI
                             PUBLIC ${IMGUI_DIR}
                             PUBLIC ${IMGUI_DIR}/backends
-                            PUBLIC ${SDL2_DIR}/include
                             )
 
 
 if(RASPBIAN)
     target_compile_definitions(IMGUI PUBLIC -D__RASPBIAN__)
-
-    # Do not search for OpenGL on raspbian. Use GLES instead.
     set(USE_GLES ON) 
+else()
+    CPMAddPackage(
+            NAME SDL 
+            GITHUB_REPOSITORY ajecc/SDL
+            VERSION 0.1.0
+    )
 endif()
 
 
@@ -53,14 +66,13 @@ if(USE_GLES)
     endif()
 else()
     find_package(OpenGL REQUIRED)
-    target_link_libraries(IMGUI PUBLIC ${OPENGL_LIBRARIES})
+    target_link_libraries(IMGUI PUBLIC SDL2main SDL2 ${OPENGL_LIBRARIES})
 endif()
 
 
-target_link_libraries(IMGUI PUBLIC SDL2main SDL2 ${CMAKE_DL_LIBS})
+target_link_libraries(IMGUI PUBLIC ${CMAKE_DL_LIBS})
 
 
-#=================== EXAMPLE ===================
 
 if(BUILD_EXAMPLES)
     add_executable(example_sdl_opengl3)
